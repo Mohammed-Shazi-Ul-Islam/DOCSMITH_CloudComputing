@@ -11,7 +11,9 @@ import hashlib
 import shutil
 import tempfile
 
-LAYERS_DIR = os.path.expanduser("~/.docksmith/layers")
+from docksmith.paths import layers_dir
+
+LAYERS_DIR = layers_dir()
 
 
 # ── Setup ─────────────────────────────────────────────────────────────────────

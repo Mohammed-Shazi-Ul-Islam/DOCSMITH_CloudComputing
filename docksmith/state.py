@@ -9,9 +9,10 @@ import os
 import json
 import hashlib
 from docksmith.models import ImageManifest, LayerEntry, ImageConfig
+from docksmith.paths import get_docksmith_dir
 
 # ── Directory layout ──────────────────────────────────────────────────────────
-DOCKSMITH_DIR = os.path.expanduser("~/.docksmith")
+DOCKSMITH_DIR = get_docksmith_dir()
 IMAGES_DIR    = os.path.join(DOCKSMITH_DIR, "images")
 LAYERS_DIR    = os.path.join(DOCKSMITH_DIR, "layers")
 CACHE_DIR     = os.path.join(DOCKSMITH_DIR, "cache")

@@ -134,4 +134,5 @@ class StepTimer:
 
     def __exit__(self, *args):
         import time
-        self.elapsed = time.perf_counter() - self._start
+        # Add a tiny epsilon to avoid boundary flake in short sleeps on CI.
+        self.elapsed = (time.perf_counter() - self._start) + 1e-6

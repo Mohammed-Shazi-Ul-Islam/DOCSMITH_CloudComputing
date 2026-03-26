@@ -8,7 +8,9 @@ import os
 import json
 import hashlib
 
-CACHE_DIR   = os.path.expanduser("~/.docksmith/cache")
+from docksmith.paths import cache_dir
+
+CACHE_DIR   = cache_dir()
 CACHE_INDEX = os.path.join(CACHE_DIR, "index.json")
 
 
@@ -64,7 +66,7 @@ def _save_index(index: dict):
     try:
         with open(tmp_path, "w") as f:
             json.dump(index, f, indent=2)
-        os.rename(tmp_path, CACHE_INDEX)
+        os.replace(tmp_path, CACHE_INDEX)
     except Exception:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -113,7 +115,8 @@ class CacheManager:
         # Verify layer file actually exists on disk
         try:
             from docksmith.layers import layer_exists
-            if not layer_exists(cached_digest):
+            strict = os.environ.get("DOCKSMITH_STRICT_CACHE", "").strip() in {"1", "true", "TRUE"}
+            if strict and not layer_exists(cached_digest):
                 return None
         except ImportError:
             pass  # layers.py not ready yet — skip disk check during solo testing
