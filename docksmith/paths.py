@@ -14,3 +14,19 @@ BUILD_LOG     = os.path.join(DOCKSMITH_DIR, "build_log.json")
 def ensure_all():
     for d in [IMAGES_DIR, LAYERS_DIR, CACHE_DIR]:
         os.makedirs(d, exist_ok=True)
+
+
+def docksmith_dir() -> str:
+    return DOCKSMITH_DIR
+
+
+def images_dir() -> str:
+    return IMAGES_DIR
+
+
+def layers_dir() -> str:
+    return LAYERS_DIR
+
+
+def cache_dir() -> str:
+    return CACHE_DIR

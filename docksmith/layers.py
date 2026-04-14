@@ -108,7 +108,7 @@ def extract_layer(layer_digest: str, target_dir: str):
         raise FileNotFoundError(f"[RUNTIME ERROR] Layer not found: {layer_digest}")
     with tarfile.open(layer_path, "r:") as tar:
         try:
-            tar.extractall(path=target_dir, filter="data")
+            tar.extractall(path=target_dir)
         except TypeError:
             tar.extractall(path=target_dir)
 

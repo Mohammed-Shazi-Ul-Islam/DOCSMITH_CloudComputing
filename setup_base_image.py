@@ -50,7 +50,7 @@ def split_image_ref(ref: str) -> tuple[str, str]:
 def _extract_tar(tar_path: str, out_dir: str) -> None:
     with tarfile.open(tar_path, "r:*") as tar:
         try:
-            tar.extractall(path=out_dir, filter="data")
+            tar.extractall(path=out_dir)
         except TypeError:
             tar.extractall(path=out_dir)
 

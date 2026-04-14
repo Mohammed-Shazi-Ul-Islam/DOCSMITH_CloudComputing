@@ -203,7 +203,7 @@
 #     elif manifest.config.Cmd:
 #         command = manifest.config.Cmd
 #     else:
-#         command = ["/bin/sh"]
+#         command = ["/bin/busybox", "sh"]
 
 #     workdir = manifest.config.WorkingDir or "/"
 
@@ -381,7 +381,7 @@ def run(image_ref, cmd_args, env):
     elif m.config.Cmd:
         command = m.config.Cmd
     else:
-        command = ["/bin/sh"]
+        command = ["/bin/busybox", "sh"]
 
     workdir = m.config.WorkingDir or "/"
 

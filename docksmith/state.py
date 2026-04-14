@@ -304,9 +304,19 @@ def list_manifests():
     return manifests
 
 
-def delete_manifest(name: str, tag: str) -> bool:
+def delete_manifest(name: str, tag: str) -> list[str]:
     path = _manifest_filename(name, tag)
     if not os.path.exists(path):
-        return False
+        raise FileNotFoundError(f"[ERROR] Image '{name}:{tag}' not found.")
+
+    manifest = load_manifest(name, tag)
+    layer_digests: list[str] = []
+    if manifest is not None:
+        layer_digests = [layer.digest for layer in (manifest.layers or [])]
+
     os.remove(path)
-    return True
+    return layer_digests
+
+
+def image_exists(name: str, tag: str) -> bool:
+    return os.path.exists(_manifest_filename(name, tag))

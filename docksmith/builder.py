@@ -225,7 +225,7 @@ def _execute_run(command, current_layers, env_dict, workdir, isolate_fn) -> str:
         os.makedirs(os.path.join(rootfs, effective_workdir.lstrip("/")), exist_ok=True)
 
         before    = snapshot_filesystem(rootfs)
-        exit_code = isolate_fn(rootfs=rootfs, command=["/bin/sh", "-c", command],
+        exit_code = isolate_fn(rootfs=rootfs, command=["/bin/busybox", "sh", "-c", command],
                                env=dict(env_dict), workdir=effective_workdir)
         if exit_code != 0:
             raise RuntimeError(f"[BUILD ERROR] RUN failed (exit {exit_code}):\n  {command}")
