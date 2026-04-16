@@ -1,5 +1,7 @@
 import os
+import re
 import subprocess
+import sys
 import tempfile
 from typing import Dict, Iterable, List, Optional
 
@@ -16,6 +18,7 @@ def _parse_env_pairs(pairs: Optional[Iterable[str]]) -> Dict[str, str]:
 
 
 def _resolve_workdir(rootfs: str, workdir: str) -> str:
+    """Resolve and create the working directory inside the rootfs."""
     rel = (workdir or "/").lstrip("/")
     host_path = os.path.join(rootfs, rel)
     os.makedirs(host_path, exist_ok=True)
@@ -65,12 +68,29 @@ def isolate_and_run(
     merged_env.update(env or {})
 
     host_workdir = _resolve_workdir(rootfs, workdir)
-    preexec_fn = None
-    cwd = host_workdir
-
+    
+    # Check if we can use namespace isolation (requires root)
     if _can_attempt_namespace_isolation():
+        # Running as root - use full isolation with chroot
         preexec_fn = _namespace_preexec(rootfs, workdir or "/")
         cwd = None
+    else:
+        # Not running as root - adjust command for non-chroot execution
+        adjusted_command = []
+        for arg in command:
+            if arg in ["/bin/sh", "/bin/bash"]:
+                # Use host shell
+                adjusted_command.append("sh")
+            elif arg.startswith('/') and not arg.startswith('/bin/') and not arg.startswith('/usr/bin/'):
+                # Convert absolute paths (except binaries) to rootfs paths
+                rootfs_path = os.path.join(rootfs, arg.lstrip('/'))
+                adjusted_command.append(rootfs_path)
+            else:
+                adjusted_command.append(arg)
+        
+        command = adjusted_command
+        preexec_fn = None
+        cwd = host_workdir
 
     try:
         proc = subprocess.Popen(
@@ -78,8 +98,18 @@ def isolate_and_run(
             cwd=cwd,
             env=merged_env,
             preexec_fn=preexec_fn,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        return proc.wait()
+        stdout, stderr = proc.communicate()
+        
+        # Print output for debugging
+        if stdout:
+            print(stdout.decode('utf-8', errors='ignore'), end='')
+        if stderr:
+            print(stderr.decode('utf-8', errors='ignore'), end='', file=sys.stderr)
+        
+        return proc.returncode
     except FileNotFoundError as exc:
         raise RuntimeError(f"[RUNTIME ERROR] Command not found: {command[0]}") from exc
     except PermissionError as exc:

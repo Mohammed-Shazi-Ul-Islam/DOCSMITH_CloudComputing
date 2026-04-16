@@ -102,15 +102,34 @@ def get_layer_size(layer_digest: str) -> int:
 
 
 def extract_layer(layer_digest: str, target_dir: str):
+    """Extract layer tar file with all contents including symlinks."""
     hex_hash   = layer_digest.replace("sha256:", "")
     layer_path = os.path.join(LAYERS_DIR, hex_hash)
     if not os.path.exists(layer_path):
         raise FileNotFoundError(f"[RUNTIME ERROR] Layer not found: {layer_digest}")
+    
     with tarfile.open(layer_path, "r:") as tar:
         try:
-            tar.extractall(path=target_dir)
+            tar.extractall(path=target_dir, filter='fully_trusted')
         except TypeError:
+            # Fallback for older Python versions without filter parameter
             tar.extractall(path=target_dir)
+    
+    # Ensure executable permissions are set for binaries
+    # This is needed when extracting on filesystems that don't preserve permissions
+    bin_dirs = ['bin', 'sbin', 'usr/bin', 'usr/sbin']
+    for bin_dir in bin_dirs:
+        bin_path = os.path.join(target_dir, bin_dir)
+        if os.path.exists(bin_path):
+            for root, dirs, files in os.walk(bin_path):
+                for fname in files:
+                    fpath = os.path.join(root, fname)
+                    if os.path.isfile(fpath):
+                        # Make all files in bin directories executable
+                        try:
+                            os.chmod(fpath, 0o755)
+                        except Exception:
+                            pass
 
 
 def delete_layer(layer_digest: str):

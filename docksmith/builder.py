@@ -196,7 +196,10 @@ def _execute_copy(src_pattern, dest, context_dir, current_layers, workdir) -> st
             for root, dirs, files in os.walk(context_dir):
                 dirs.sort()
                 for f in sorted(files):
-                    matched.append(os.path.join(root, f))
+                    full_path = os.path.join(root, f)
+                    # Skip Docksmithfile itself
+                    if os.path.basename(full_path) != "Docksmithfile":
+                        matched.append(full_path)
         else:
             full_pattern = os.path.join(context_dir, src_pattern)
             matched = sorted(glob_module.glob(full_pattern, recursive=True))
@@ -207,32 +210,53 @@ def _execute_copy(src_pattern, dest, context_dir, current_layers, workdir) -> st
         for src_path in matched:
             if os.path.isfile(src_path):
                 rel     = os.path.relpath(src_path, context_dir)
-                dst_dir = os.path.join(dest_abs, os.path.dirname(rel))
-                os.makedirs(dst_dir, exist_ok=True)
-                shutil.copy2(src_path, os.path.join(dst_dir, os.path.basename(rel)))
+                dst_file = os.path.join(dest_abs, rel)
+                os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                shutil.copy2(src_path, dst_file)
             elif os.path.isdir(src_path):
-                shutil.copytree(src_path, os.path.join(dest_abs, os.path.basename(src_path)), dirs_exist_ok=True)
+                rel = os.path.relpath(src_path, context_dir)
+                dst_dir = os.path.join(dest_abs, rel)
+                shutil.copytree(src_path, dst_dir, dirs_exist_ok=True)
 
+        # Create tar with paths relative to rootfs (not dest_abs)
+        # This ensures files are extracted to the correct location
         all_paths = collect_all_paths(dest_abs)
-        tar_bytes = create_delta_tar(dest_abs, all_paths)
+        # Create tar from rootfs base, not dest_abs
+        tar_bytes = create_delta_tar(rootfs, all_paths)
         return store_layer(tar_bytes)
 
 
 def _execute_run(command, current_layers, env_dict, workdir, isolate_fn) -> str:
     with tempfile.TemporaryDirectory(prefix="docksmith_run_") as rootfs:
         _assemble_rootfs(current_layers, rootfs)
+        
+        # Ensure WORKDIR exists in the rootfs before running command
         effective_workdir = workdir or "/"
-        os.makedirs(os.path.join(rootfs, effective_workdir.lstrip("/")), exist_ok=True)
+        workdir_abs = os.path.join(rootfs, effective_workdir.lstrip("/"))
+        os.makedirs(workdir_abs, exist_ok=True)
 
-        before    = snapshot_filesystem(rootfs)
-        exit_code = isolate_fn(rootfs=rootfs, command=["/bin/busybox", "sh", "-c", command],
+        before = snapshot_filesystem(rootfs)
+        
+        # Adjust the command to use rootfs paths
+        # Replace absolute paths like /app/file.txt with rootfs paths
+        adjusted_command = command
+        if effective_workdir != "/":
+            # Replace /app/ with the actual rootfs path
+            workdir_in_rootfs = os.path.join(rootfs, effective_workdir.lstrip("/"))
+            adjusted_command = command.replace(effective_workdir + "/", workdir_in_rootfs + "/")
+            adjusted_command = adjusted_command.replace(effective_workdir + " ", workdir_in_rootfs + " ")
+            if adjusted_command.endswith(effective_workdir):
+                adjusted_command = adjusted_command[:-len(effective_workdir)] + workdir_in_rootfs
+        
+        # Use host shell with adjusted command
+        exit_code = isolate_fn(rootfs=rootfs, command=["sh", "-c", adjusted_command],
                                env=dict(env_dict), workdir=effective_workdir)
         if exit_code != 0:
             raise RuntimeError(f"[BUILD ERROR] RUN failed (exit {exit_code}):\n  {command}")
 
-        after         = snapshot_filesystem(rootfs)
+        after = snapshot_filesystem(rootfs)
         changed_paths = compute_delta_paths(before, after, rootfs)
-        tar_bytes     = create_delta_tar(rootfs, changed_paths) if changed_paths else create_delta_tar(rootfs, [])
+        tar_bytes = create_delta_tar(rootfs, changed_paths) if changed_paths else create_delta_tar(rootfs, [])
         return store_layer(tar_bytes)
 
 

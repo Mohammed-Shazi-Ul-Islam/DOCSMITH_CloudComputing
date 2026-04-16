@@ -48,10 +48,14 @@ def split_image_ref(ref: str) -> tuple[str, str]:
 
 
 def _extract_tar(tar_path: str, out_dir: str) -> None:
+    """Extract tar file with all contents including symlinks."""
     with tarfile.open(tar_path, "r:*") as tar:
+        # Use 'fully_trusted' filter for base image import (one-time setup)
+        # This allows absolute symlinks which are common in Alpine Linux
         try:
-            tar.extractall(path=out_dir)
+            tar.extractall(path=out_dir, filter='fully_trusted')
         except TypeError:
+            # Fallback for older Python versions without filter parameter
             tar.extractall(path=out_dir)
 
 
